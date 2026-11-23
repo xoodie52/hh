@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeFind - 교내 프라이버시 안심 분실물 찾기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+        body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; }
+        .chat-scroll::-webkit-scrollbar { width: 6px; }
+        .chat-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <!-- 상단 내비게이션 & 데모 계정 전환 바 -->
+    <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <div class="bg-indigo-600 text-white p-2 rounded-lg">
+                    <i class="fa-solid fa-shield-halved text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-slate-900 leading-tight">SafeFind</h1>
+                    <p class="text-xs text-slate-500">프라이버시 안심 교내 분실물 매칭</p>
+                </div>
+            </div>
+
+            <!-- 빠른 체험 계정 전환기 -->
+            <div class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                <span class="text-xs font-semibold text-slate-500 px-2"><i class="fa-solid fa-users-gear mr-1"></i>체험 계정:</span>
+                <button onclick="switchDemoAccount('student1')" id="btn-student1" class="px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow-sm">
+                    student1 (분실자)
+                </button>
+                <button onclick="switchDemoAccount('student2')" id="btn-student2" class="px-3 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:bg-white">
+                    student2 (습득자)
+                </button>
+            </div>
+
+            <!-- 현재 로그인 정보 및 포인트 -->
+            <div class="flex items-center gap-3">
+                <div class="text-right">
+                    <div class="text-xs text-slate-500">접속 아이디: <span id="current-user-id" class="font-bold text-slate-800">student1</span></div>
+                    <div class="text-sm font-bold text-indigo-600"><i class="fa-solid fa-coins mr-1 text-amber-500"></i><span id="current-user-points">10</span> P</div>
+                </div>
+                <button onclick="openAuthModal()" class="text-xs bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700 transition">
+                    계정 변경/가입
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 컨테이너 -->
+    <main class="max-w-5xl mx-auto px-4 py-6">
+        
+        <!-- 탭 메뉴 -->
+        <div class="flex border-b border-slate-200 mb-6 gap-2 overflow-x-auto">
+            <button onclick="switchTab('board')" id="tab-board" class="tab-btn px-4 py-2.5 font-bold text-sm border-b-2 border-indigo-600 text-indigo-600 whitespace-nowrap">
+                <i class="fa-solid fa-magnifying-glass mr-1.5"></i>분실물·습득물 게시판
+            </button>
+            <button onclick="switchTab('register')" id="tab-register" class="tab-btn px-4 py-2.5 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+                <i class="fa-solid fa-pen-to-square mr-1.5"></i>물건 등록하기
+            </button>
+            <button onclick="switchTab('chat')" id="tab-chat" class="tab-btn px-4 py-2.5 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap relative">
+                <i class="fa-solid fa-comments mr-1.5"></i>1:1 익명 채팅방
+                <span id="chat-badge" class="hidden ml-1 bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">N</span>
+            </button>
+            <button onclick="switchTab('shop')" id="tab-shop" class="tab-btn px-4 py-2.5 font-medium text-sm border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap">
+                <i class="fa-solid fa-gift mr-1.5"></i>포인트 보상샵
+            </button>
+        </div>
+
+        <!-- 1. 게시판 탭 -->
+        <section id="section-board" class="space-y-6">
+            <!-- AI 스마트 매칭 추천 배너 -->
+            <div id="ai-match-box" class="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-2xl p-4 shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-sm font-bold text-indigo-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> AI 키워드 유사도 자동 매칭 추천
+                    </h2>
+                    <span class="text-[11px] bg-white text-indigo-600 px-2 py-0.5 rounded-full font-semibold border border-indigo-100">실시간 텍스트 분석</span>
+                </div>
+                <div id="ai-match-list" class="text-xs text-slate-700 space-y-2">
+                    <!-- JS로 동적 렌더링 -->
+                </div>
+            </div>
+
+            <!-- 필터 & 검색 -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex gap-2">
+                    <button onclick="filterItems('ALL')" class="filter-btn bg-slate-800 text-white px-3 py-1.5 rounded-lg text-xs font-semibold">전체</button>
+                    <button onclick="filterItems('LOST')" class="filter-btn bg-white text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50">분실했어요</button>
+                    <button onclick="filterItems('FOUND')" class="filter-btn bg-white text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50">주웠어요</button>
+                </div>
+                <input type="text" id="search-input" onkeyup="renderItems()" placeholder="장소, 물건 특징 검색..." class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 w-full sm:w-64 focus:outline-none focus:border-indigo-500 bg-white">
+            </div>
+
+            <!-- 게시글 그리드 -->
+            <div id="items-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- JS로 동적 렌더링 -->
+            </div>
+        </section>
+
+        <!-- 2. 물건 등록 탭 -->
+        <section id="section-register" class="hidden max-w-xl mx-auto">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <h2 class="text-lg font-bold text-slate-900">📌 새 분실물 / 습득물 등록</h2>
+                <p class="text-xs text-slate-500">실명이나 전화번호 등 개인정보는 절대 입력하지 마세요. 매칭은 익명 채팅으로 진행됩니다.</p>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">등록 유형</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="reg-type" value="LOST" checked class="peer sr-only">
+                            <div class="p-3 rounded-xl border border-slate-200 text-center text-sm font-bold peer-checked:border-rose-500 peer-checked:bg-rose-50 peer-checked:text-rose-700 transition">
+                                😢 분실했어요 (찾는 중)
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="reg-type" value="FOUND" class="peer sr-only">
+                            <div class="p-3 rounded-xl border border-slate-200 text-center text-sm font-bold peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700 transition">
+                                🎁 주웠어요 (보관 중)
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">카테고리</label>
+                        <select id="reg-category" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:border-indigo-500">
+                            <option value="전자기기">전자기기 (이어폰/충전기 등)</option>
+                            <option value="지갑/카드">지갑 / 학생증 / 카드</option>
+                            <option value="책/학용품">책 / 노트 / 필통</option>
+                            <option value="의류/잡화">체육복 / 겉옷 / 우산</option>
+                            <option value="기타">기타 물품</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">발견/분실 장소</label>
+                        <input type="text" id="reg-location" placeholder="예: 본관 2층 복도, 급식실 앞" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">물건 외관 및 특징 설명</label>
+                    <textarea id="reg-desc" rows="3" placeholder="예: 검은색 갤럭시 버즈2 프로 케이스입니다. 키링 고리가 달려있어요. (세부 특징은 익명 채팅에서 확인하세요!)" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50 focus:bg-white focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+
+                <button onclick="registerItem()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition shadow-sm">
+                    익명으로 안전하게 등록하기
+                </button>
+            </div>
+        </section>
+
+        <!-- 3. 1:1 익명 채팅방 탭 -->
+        <section id="section-chat" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px]">
+                <!-- 채팅방 목록 -->
+                <div class="border-r border-slate-200 bg-slate-50 p-3 flex flex-col">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider px-2 mb-3">진행 중인 익명 채팅</h3>
+                    <div id="chat-room-list" class="space-y-2 flex-1 overflow-y-auto">
+                        <!-- JS 렌더링 -->
+                    </div>
+                </div>
+
+                <!-- 채팅창 영역 -->
+                <div class="md:col-span-2 flex flex-col h-[520px]">
+                    <div id="chat-header" class="p-4 border-b border-slate-200 flex items-center justify-between bg-white">
+                        <div>
+                            <h3 id="active-chat-title" class="font-bold text-sm text-slate-900">채팅방을 선택해주세요</h3>
+                            <p id="active-chat-sub" class="text-xs text-slate-500">게시글에서 '익명 채팅 시작'을 누르면 대화가 열립니다.</p>
+                        </div>
+                        <button id="complete-match-btn" onclick="completeMatch()" class="hidden bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-emerald-700 transition shadow-sm">
+                            🤝 물건 전달 완료 (+50P 지급)
+                        </button>
+                    </div>
+
+                    <!-- 프라이버시 안전 배너 -->
+                    <div class="bg-amber-50 border-b border-amber-100 px-4 py-2 text-[11px] text-amber-800 flex items-center gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+                        <span><strong>안전 수칙:</strong> 전화번호, 카카오톡 ID 등 개인정보를 요구하지 마세요. 물건의 세부 특징(스티커 모양, 배경화면 등)으로 주인을 확인하세요.</span>
+                    </div>
+
+                    <!-- 메시지 목록 -->
+                    <div id="chat-messages" class="flex-1 p-4 overflow-y-auto chat-scroll space-y-3 bg-slate-50/50">
+                        <div class="text-center text-xs text-slate-400 mt-20">왼쪽 목록에서 대화방을 선택하세요.</div>
+                    </div>
+
+                    <!-- 빠른 질문 추천 버튼 -->
+                    <div id="quick-replies" class="hidden px-4 py-2 bg-white border-t border-slate-100 flex gap-1.5 overflow-x-auto">
+                        <button onclick="sendQuickMsg('케이스 안에 붙어있는 스티커가 무엇인가요?')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full whitespace-nowrap">💬 스티커 특징 질문</button>
+                        <button onclick="sendQuickMsg('몇 시쯤 어디서 잃어버리셨나요?')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full whitespace-nowrap">📍 분실 시간/장소 확인</button>
+                        <button onclick="sendQuickMsg('점심시간에 2층 교무실 앞에서 전달해 드릴까요?')" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-full whitespace-nowrap">🏫 교내 전달 장소 제안</button>
+                    </div>
+
+                    <!-- 입력창 -->
+                    <div id="chat-input-area" class="hidden p-3 bg-white border-t border-slate-200 flex gap-2">
+                        <input type="text" id="chat-input" onkeypress="if(event.key==='Enter') sendMessage()" placeholder="익명 메시지를 입력하세요..." class="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-500">
+                        <button onclick="sendMessage()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition">전송</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. 포인트 보상샵 탭 -->
+        <section id="section-shop" class="hidden space-y-6">
+            <div class="bg-indigo-600 text-white rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+                <div>
+                    <h2 class="text-lg font-bold">🎁 습득자 포인트 보상샵</h2>
+                    <p class="text-xs text-indigo-100 mt-1">분실물을 찾아주고 얻은 포인트로 교내 혜택을 교환하세요! (물건 전달 완료 시 +50P 자동 적립)</p>
+                </div>
+                <div class="bg-white/10 backdrop-blur-sm px-4 py-3 rounded-xl border border-white/20 text-right">
+                    <div class="text-xs text-indigo-100">내 보유 포인트</div>
+                    <div class="text-2xl font-bold text-amber-300"><span id="shop-points">10</span> P</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full">인기 보상</span>
+                        <h3 class="font-bold text-base mt-3">🥐 교내 매점 간식 교환권</h3>
+                        <p class="text-xs text-slate-500 mt-1">매점에서 2,000원 상당의 빵 또는 음료수와 교환할 수 있는 바코드 쿠폰입니다.</p>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <span class="font-bold text-slate-800">50 P</span>
+                        <button onclick="redeemReward('교내 매점 간식 교환권', 50)" class="bg-slate-900 text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-slate-800 transition">교환하기</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">생활기록부 연계</span>
+                        <h3 class="font-bold text-base mt-3">🏅 교내 선행상 / 봉사 1시간</h3>
+                        <p class="text-xs text-slate-500 mt-1">학생부 선행 기록 추천 및 교내 환경·질서 봉사활동 1시간 인증서를 발급합니다.</p>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <span class="font-bold text-slate-800">100 P</span>
+                        <button onclick="redeemReward('교내 선행 봉사 1시간 인증서', 100)" class="bg-slate-900 text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-slate-800 transition">교환하기</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <span class="text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full">학급 이벤트</span>
+                        <h3 class="font-bold text-base mt-3">🥤 우리 반 음료수 쏘기 응모권</h3>
+                        <p class="text-xs text-slate-500 mt-1">매월 분실물 반환 우수 학급 선정 시 학급 전체 간식 지원 가산점이 부여됩니다.</p>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                        <span class="font-bold text-slate-800">30 P</span>
+                        <button onclick="redeemReward('학급 간식 이벤트 응모권', 30)" class="bg-slate-900 text-white text-xs font-bold px-3.5 py-2 rounded-lg hover:bg-slate-800 transition">교환하기</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 발급된 쿠폰함 -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 class="font-bold text-sm text-slate-800 mb-3"><i class="fa-solid fa-ticket mr-1.5 text-indigo-600"></i>내 발급 쿠폰함</h3>
+                <div id="coupon-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <!-- JS 렌더링 -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 로그인/회원가입 모달 -->
+    <div id="auth-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-xl">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">🔐 익명 계정 로그인 / 가입</h3>
+                <button onclick="closeAuthModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-slate-500">개인정보 보호를 위해 실명이나 전화번호 대신 임의의 익명 아이디만 사용합니다.</p>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">익명 아이디</label>
+                <input type="text" id="auth-id" placeholder="예: blue_sky99" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">비밀번호</label>
+                <input type="password" id="auth-pw" placeholder="비밀번호 입력" class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2">
+            </div>
+            <button onclick="loginOrRegister()" class="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl hover:bg-indigo-700 transition text-sm">
+                접속하기 (미등록 아이디는 자동 가입)
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 초기 데이터 설정 (LocalStorage 연동)
+        const defaultData = {
+            currentUser: 'student1',
+            users: {
+                'student1': { pw: '123', points: 10, coupons: [] },
+                'student2': { pw: '123', points: 50, coupons: [] }
+            },
+            items: [
+                {
+                    id: 101,
+                    type: 'LOST',
+                    category: '전자기기',
+                    location: '본관 2층 정수기 옆',
+                    desc: '검은색 갤럭시 버즈2 프로 케이스 잃어버렸습니다. 고양이 키링이 달려있어요.',
+                    author: 'student1',
+                    status: 'OPEN',
+                    date: '오늘 12:30'
+                },
+                {
+                    id: 102,
+                    type: 'FOUND',
+                    category: '전자기기',
+                    location: '2층 복도 정수기 근처',
+                    desc: '검은색 무선 이어폰 케이스 주워서 보관 중입니다. 캐릭터 키링 달려있습니다.',
+                    author: 'student2',
+                    status: 'OPEN',
+                    date: '오늘 12:45'
+                },
+                {
+                    id: 103,
+                    type: 'FOUND',
+                    category: '지갑/카드',
+                    location: '급식실 입구',
+                    desc: '파란색 카드지갑 습득했습니다. 안에 교통카드 들어있어요.',
+                    author: 'student2',
+                    status: 'OPEN',
+                    date: '어제 13:10'
+                }
+            ],
+            chats: [
+                {
+                    roomId: 'room_101_student2',
+                    itemId: 101,
+                    itemTitle: '[분실] 본관 2층 정수기 옆 - 전자기기',
+                    author: 'student1',
+                    requester: 'student2',
+                    completed: false,
+                    messages: [
+                        { sender: 'student2', text: '안녕하세요! 2층 정수기 옆에서 검은색 버즈 케이스 주웠는데 본인 물건 맞으실까요?', time: '12:46' }
+                    ]
+                }
+            ]
+        };
+
+        let appState = JSON.parse(localStorage.getItem('safefind_data')) || defaultData;
+        let currentFilter = 'ALL';
+        let activeRoomId = 'room_101_student2';
+
+        function saveState() {
+            localStorage.setItem('safefind_data', JSON.stringify(appState));
+            updateUI();
+        }
+
+        // 계정 전환 및 UI 업데이트
+        function switchDemoAccount(userId) {
+            appState.currentUser = userId;
+            saveState();
+        }
+
+        function updateUI() {
+            const user = appState.currentUser;
+            const userData = appState.users[user];
+            document.getElementById('current-user-id').innerText = user;
+            document.getElementById('current-user-points').innerText = userData.points;
+            document.getElementById('shop-points').innerText = userData.points;
+
+            // 데모 버튼 활성화 스타일
+            ['student1', 'student2'].forEach(id => {
+                const btn = document.getElementById('btn-' + id);
+                if (btn) {
+                    if (id === user) {
+                        btn.className = 'px-3 py-1 rounded-lg text-xs font-bold transition bg-indigo-600 text-white shadow-sm';
+                    } else {
+                        btn.className = 'px-3 py-1 rounded-lg text-xs font-bold transition text-slate-600 hover:bg-white';
+                    }
+                }
+            });
+
+            renderAIMatches();
+            renderItems();
+            renderChatRooms();
+            renderActiveChat();
+            renderCoupons();
+        }
+
+        // 탭 전환
+        function switchTab(tabName) {
+            ['board', 'register', 'chat', 'shop'].forEach(t => {
+                document.getElementById('section-' + t).classList.add('hidden');
+                const btn = document.getElementById('tab-' + t);
+                btn.classList.remove('border-indigo-600', 'text-indigo-600', 'font-bold');
+                btn.classList.add('border-transparent', 'text-slate-500', 'font-medium');
+            });
+            document.getElementById('section-' + tabName).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-' + tabName);
+            activeBtn.classList.add('border-indigo-600', 'text-indigo-600', 'font-bold');
+            activeBtn.classList.remove('border-transparent', 'text-slate-500', 'font-medium');
+        }
+
+        // AI 키워드 유사도 매칭 알고리즘 (Jaccard + 핵심 토큰 가중치)
+        function calculateSimilarity(itemA, itemB) {
+            if (itemA.category !== itemB.category) return 0;
+            const textA = (itemA.location + ' ' + itemA.desc).replace(/[^가-힣a-zA-Z0-9\s]/g, '').split(/\s+/);
+            const textB = (itemB.location + ' ' + itemB.desc).replace(/[^가-힣a-zA-Z0-9\s]/g, '').split(/\s+/);
+            const setA = new Set(textA.filter(w => w.length > 1));
+            const setB = new Set(textB.filter(w => w.length > 1));
+            let intersection = 0;
+            setA.forEach(word => { if (setB.has(word)) intersection++; });
+            const union = new Set([...setA, ...setB]).size;
+            return union === 0 ? 0 : Math.min(98, Math.round((intersection / union) * 100) + 35);
+        }
+
+        function renderAIMatches() {
+            const lostItems = appState.items.filter(i => i.type === 'LOST' && i.status === 'OPEN');
+            const foundItems = appState.items.filter(i => i.type === 'FOUND' && i.status === 'OPEN');
+            const listEl = document.getElementById('ai-match-list');
+            let matches = [];
+
+            lostItems.forEach(lost => {
+                foundItems.forEach(found => {
+                    const score = calculateSimilarity(lost, found);
+                    if (score >= 45) {
+                        matches.push({ lost, found, score });
+                    }
+                });
+            });
+
+            if (matches.length === 0) {
+                listEl.innerHTML = `<p class="text-slate-500">현재 AI가 감지한 높은 일치율의 분실-습득 쌍이 없습니다.</p>`;
+                return;
+            }
+
+            listEl.innerHTML = matches.map(m => `
+                <div class="bg-white p-2.5 rounded-xl border border-indigo-100 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <span class="font-bold text-indigo-600">[일치율 ${m.score}%]</span>
+                        <span class="font-semibold text-rose-600">분실(#${m.lost.id} ${m.lost.location})</span> ↔ 
+                        <span class="font-semibold text-emerald-600">습득(#${m.found.id} ${m.found.location})</span>
+                    </div>
+                    <button onclick="startChat(${m.lost.id})" class="bg-indigo-600 text-white px-2.5 py-1 rounded-lg font-bold hover:bg-indigo-700 transition">
+                        바로 익명 채팅하기
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // 게시글 필터 & 렌더링
+        function filterItems(type) {
+            currentFilter = type;
+            renderItems();
+        }
+
+        function renderItems() {
+            const keyword = document.getElementById('search-input').value.toLowerCase();
+            const grid = document.getElementById('items-grid');
+            const filtered = appState.items.filter(item => {
+                const matchType = currentFilter === 'ALL' || item.type === currentFilter;
+                const matchKey = item.location.toLowerCase().includes(keyword) || item.desc.toLowerCase().includes(keyword) || item.category.toLowerCase().includes(keyword);
+                return matchType && matchKey;
+            });
+
+            grid.innerHTML = filtered.map(item => {
+                const isLost = item.type === 'LOST';
+                const badgeClass = isLost ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700';
+                const badgeText = isLost ? '분실했어요' : '주웠어요';
+                const isClosed = item.status === 'CLOSED';
+
+                return `
+                    <div class="bg-white p-5 rounded-2xl border ${isClosed ? 'border-slate-200 opacity-60' : 'border-slate-200 hover:border-indigo-300'} shadow-sm transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <span class="text-xs font-bold px-2.5 py-1 rounded-full ${badgeClass}">${badgeText}</span>
+                                <span class="text-xs text-slate-400">#${item.id} · ${item.date}</span>
+                            </div>
+                            <h3 class="font-bold text-base text-slate-900">${item.category} <span class="text-xs font-normal text-slate-500">(${item.location})</span></h3>
+                            <p class="text-xs text-slate-600 mt-2 leading-relaxed">${item.desc}</p>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-[11px] text-slate-400"><i class="fa-solid fa-user-secret mr-1"></i>작성자: ${item.author === appState.currentUser ? '나 (' + item.author + ')' : '익명 학생'}</span>
+                            ${isClosed 
+                                ? `<span class="text-xs font-bold text-slate-500"><i class="fa-solid fa-check-circle text-emerald-500 mr-1"></i>전달 완료됨</span>`
+                                : (item.author === appState.currentUser 
+                                    ? `<span class="text-xs text-indigo-600 font-semibold">내 게시글</span>`
+                                    : `<button onclick="startChat(${item.id})" class="bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-indigo-600 transition"><i class="fa-regular fa-comments mr-1"></i>익명 채팅 시작</button>`)
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 물건 등록
+        function registerItem() {
+            const type = document.querySelector('input[name="reg-type"]:checked').value;
+            const category = document.getElementById('reg-category').value;
+            const location = document.getElementById('reg-location').value.trim();
+            const desc = document.getElementById('reg-desc').value.trim();
+
+            if (!location || !desc) {
+                alert('장소와 물건 특징을 모두 입력해주세요!');
+                return;
+            }
+
+            const newItem = {
+                id: Math.floor(100 + Math.random() * 900),
+                type,
+                category,
+                location,
+                desc,
+                author: appState.currentUser,
+                status: 'OPEN',
+                date: '방금 전'
+            };
+
+            appState.items.unshift(newItem);
+            document.getElementById('reg-location').value = '';
+            document.getElementById('reg-desc').value = '';
+            saveState();
+            switchTab('board');
+            alert('익명으로 안전하게 등록되었습니다!');
+        }
+
+        // 1:1 익명 채팅방 시작
+        function startChat(itemId) {
+            const item = appState.items.find(i => i.id === itemId);
+            if (!item) return;
+
+            const user = appState.currentUser;
+            if (item.author === user) {
+                alert('본인이 작성한 게시글입니다. 1:1 익명 채팅방 탭에서 요청 온 대화를 확인하세요!');
+                switchTab('chat');
+                return;
+            }
+
+            const roomId = `room_${itemId}_${user}`;
+            let chat = appState.chats.find(c => c.roomId === roomId);
+
+            if (!chat) {
+                chat = {
+                    roomId,
+                    itemId,
+                    itemTitle: `[${item.type === 'LOST' ? '분실' : '습득'}] ${item.location} - ${item.category}`,
+                    author: item.author,
+                    requester: user,
+                    completed: false,
+                    messages: [
+                        { sender: user, text: '안녕하세요! 등록하신 물건 관련해서 확인차 연락드립니다.', time: '방금' }
+                    ]
+                };
+                appState.chats.unshift(chat);
+            }
+
+            activeRoomId = roomId;
+            saveState();
+            switchTab('chat');
+        }
+
+        function renderChatRooms() {
+            const user = appState.currentUser;
+            const myChats = appState.chats.filter(c => c.author === user || c.requester === user);
+            const listEl = document.getElementById('chat-room-list');
+
+            if (myChats.length === 0) {
+                listEl.innerHTML = `<div class="text-xs text-slate-400 text-center py-8">참여 중인 채팅방이 없습니다.</div>`;
+                return;
+            }
+
+            listEl.innerHTML = myChats.map(c => {
+                const isActive = c.roomId === activeRoomId;
+                const roleLabel = c.author === user ? '내 게시글 문의' : '내가 문의한 글';
+                return `
+                    <div onclick="selectRoom('${c.roomId}')" class="p-3 rounded-xl cursor-pointer transition border ${isActive ? 'bg-white border-indigo-500 shadow-xs' : 'bg-white/60 border-slate-200 hover:bg-white'}">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">${roleLabel}</span>
+                            ${c.completed ? '<span class="text-[10px] font-bold text-emerald-600">완료됨</span>' : ''}
+                        </div>
+                        <div class="text-xs font-bold text-slate-800 truncate">${c.itemTitle}</div>
+                        <div class="text-[11px] text-slate-500 truncate mt-1">${c.messages[c.messages.length - 1]?.text || ''}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectRoom(roomId) {
+            activeRoomId = roomId;
+            renderChatRooms();
+            renderActiveChat();
+        }
+
+        function renderActiveChat() {
+            const chat = appState.chats.find(c => c.roomId === activeRoomId);
+            const msgBox = document.getElementById('chat-messages');
+            const inputArea = document.getElementById('chat-input-area');
+            const quickReplies = document.getElementById('quick-replies');
+            const completeBtn = document.getElementById('complete-match-btn');
+
+            if (!chat) {
+                inputArea.classList.add('hidden');
+                quickReplies.classList.add('hidden');
+                completeBtn.classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('active-chat-title').innerText = chat.itemTitle;
+            document.getElementById('active-chat-sub').innerText = '상대방과의 모든 대화는 익명 닉네임으로 보호됩니다.';
+            inputArea.classList.remove('hidden');
+            quickReplies.classList.remove('hidden');
+
+            if (!chat.completed) {
+                completeBtn.classList.remove('hidden');
+            } else {
+                completeBtn.classList.add('hidden');
+            }
+
+            const user = appState.currentUser;
+            msgBox.innerHTML = chat.messages.map(m => {
+                const isMe = m.sender === user;
+                const anonName = m.sender === chat.author ? '게시글 작성자(익명)' : '채팅 요청자(익명)';
+                return `
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                        <span class="text-[10px] text-slate-400 mb-1 px-1">${isMe ? '나 (' + anonName + ')' : anonName}</span>
+                        <div class="max-w-[75%] px-3.5 py-2 rounded-2xl text-xs leading-relaxed ${isMe ? 'bg-indigo-600 text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-none'}">
+                            ${m.text}
+                        </div>
+                        <span class="text-[10px] text-slate-400 mt-0.5 px-1">${m.time}</span>
+                    </div>
+                `;
+            }).join('');
+            msgBox.scrollTop = msgBox.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text || !activeRoomId) return;
+
+            const chat = appState.chats.find(c => c.roomId === activeRoomId);
+            chat.messages.push({
+                sender: appState.currentUser,
+                text,
+                time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+            });
+            input.value = '';
+            saveState();
+        }
+
+        function sendQuickMsg(text) {
+            document.getElementById('chat-input').value = text;
+            sendMessage();
+        }
+
+        // 물건 전달 완료 및 습득자 포인트 자동 지급
+        function completeMatch() {
+            const chat = appState.chats.find(c => c.roomId === activeRoomId);
+            if (!chat || chat.completed) return;
+
+            const item = appState.items.find(i => i.id === chat.itemId);
+            // 습득자 판별: 게시글이 '분실(LOST)'이면 채팅 요청자가 습득자, 게시글이 '습득(FOUND)'이면 게시글 작성자가 습득자
+            const finderId = (item && item.type === 'LOST') ? chat.requester : chat.author;
+
+            chat.completed = true;
+            if (item) item.status = 'CLOSED';
+
+            if (appState.users[finderId]) {
+                appState.users[finderId].points += 50;
+            }
+
+            chat.messages.push({
+                sender: appState.currentUser,
+                text: `🎉 [시스템 알림] 물건 전달이 완료되었습니다! 습득자(${finderId})에게 감사 보상 +50P가 자동 지급되었습니다.`,
+                time: '완료'
+            });
+
+            saveState();
+            alert(`물건 전달 완료 처리되었습니다! 습득자(${finderId})에게 +50P가 지급되었습니다.`);
+        }
+
+        // 포인트 보상 교환
+        function redeemReward(name, cost) {
+            const user = appState.currentUser;
+            const userData = appState.users[user];
+
+            if (userData.points < cost) {
+                alert('포인트가 부족합니다! 분실물을 찾아주고 포인트를 모아보세요.');
+                return;
+            }
+
+            userData.points -= cost;
+            const code = 'SF-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+            userData.coupons.unshift({ name, code, date: new Date().toLocaleDateString() });
+            saveState();
+            alert(`'${name}' 교환 완료! 하단 내 쿠폰함에서 바코드 번호를 확인하세요.`);
+        }
+
+        function renderCoupons() {
+            const coupons = appState.users[appState.currentUser].coupons || [];
+            const listEl = document.getElementById('coupon-list');
+            if (coupons.length === 0) {
+                listEl.innerHTML = `<div class="text-slate-400 col-span-2 py-2">아직 교환한 쿠폰이 없습니다.</div>`;
+                return;
+            }
+            listEl.innerHTML = coupons.map(c => `
+                <div class="p-3 rounded-xl border border-dashed border-indigo-300 bg-indigo-50/50 flex justify-between items-center">
+                    <div>
+                        <div class="font-bold text-slate-800">${c.name}</div>
+                        <div class="text-[11px] text-slate-500">발급일: ${c.date}</div>
+                    </div>
+                    <span class="font-mono font-bold text-indigo-700 bg-white px-2.5 py-1 rounded border border-indigo-200">${c.code}</span>
+                </div>
+            `).join('');
+        }
+
+        // 모달 제어
+        function openAuthModal() { document.getElementById('auth-modal').classList.remove('hidden'); }
+        function closeAuthModal() { document.getElementById('auth-modal').classList.add('hidden'); }
+        function loginOrRegister() {
+            const id = document.getElementById('auth-id').value.trim();
+            const pw = document.getElementById('auth-pw').value.trim();
+            if (!id || !pw) return alert('아이디와 비밀번호를 입력하세요.');
+
+            if (!appState.users[id]) {
+                appState.users[id] = { pw, points: 0, coupons: [] };
+                alert(`새 익명 계정 '${id}'이(가) 생성되었습니다!`);
+            } else if (appState.users[id].pw !== pw) {
+                return alert('비밀번호가 일치하지 않습니다.');
+            }
+
+            appState.currentUser = id;
+            closeAuthModal();
+            saveState();
+        }
+
+        // 초기 실행
+        updateUI();
+    </script>
+</body>
+</html>
